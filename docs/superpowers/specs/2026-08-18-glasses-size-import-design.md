@@ -41,14 +41,16 @@ Six dimensions, all values in whole millimetres:
 
 Two known defects in this file, both handled at prep time:
 
-1. **Duplicates.** 244 of 648 rows are a repeat of an existing (dimension, value) pair.
-   Worst case: `lens height 51` has 11 IDs. **Rule: keep the lowest ID.** This matches
-   how the user assigns them manually today.
+1. **Duplicates.** 244 rows belong to duplicate groups; collapsing them removes 187
+   redundant rows. Worst case: `lens height 51` has 11 IDs. **Rule: keep the lowest ID.**
+   This matches how the user assigns them manually today.
 2. **Junk rows.** Six rows are unusable — IDs 4602 and 4805 have value `None`; IDs 34506,
    34509, 34512, 34513 have comma-decimal values (`26,3`, `40,2`, `131,8`, `37,1`).
    They are dropped, and `refresh_data.py` prints them so nothing disappears silently.
 
-After dedup and cleaning: **404 usable categories.**
+After dedup and cleaning: **455 usable categories** (648 rows - 6 junk - 187 collapsed
+duplicates), broken down as: bridge 64, glasses to bend length 72, glasses width 89,
+lens height 85, lens width 84, temple length 61.
 
 Coverage inside real-world ranges is complete except `glasses to bend length`, which has
 no category for 88, 118 or 119.
