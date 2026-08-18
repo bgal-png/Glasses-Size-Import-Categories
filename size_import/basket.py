@@ -9,7 +9,12 @@ from size_import.categories import DIMENSIONS, resolve
 
 
 def add(basket, global_id, name, values):
-    """Queue a product, or merge another size into one already queued."""
+    """Queue a product, or merge another size into one already queued.
+
+    If the product is already in the basket, its stored name is kept and
+    the `name` argument is ignored; passing empty `values` queues the
+    product with no value sets, so it will not contribute to the export.
+    """
     updated = dict(basket)
     existing = updated.get(global_id)
 
@@ -30,7 +35,13 @@ def remove(basket, global_id):
 
 
 def category_ids(entry, lookup):
-    """Ordered, repeat-free category IDs for one basket entry."""
+    """Ordered, repeat-free category IDs for one basket entry.
+
+    Takes a raw entry (`{"name": ..., "value_sets": [...]}`), not
+    `basket, global_id`, because the UI calls it per rendered row. IDs are
+    ordered by value set in insertion order, and within each value set by
+    the fixed `DIMENSIONS` order.
+    """
     ids = []
     for value_set in entry["value_sets"]:
         for dimension in DIMENSIONS:

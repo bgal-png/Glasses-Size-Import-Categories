@@ -35,3 +35,18 @@ def test_to_bytes_produces_a_readable_workbook():
     data = to_bytes([(1588262, "4156;4157")])
     sheet = openpyxl.load_workbook(BytesIO(data)).active
     assert sheet["A1"].value == 1588262
+
+
+def test_single_category_id_is_written_as_text():
+    sheet = build_workbook([(1588262, "10")]).active
+    assert isinstance(sheet["B1"].value, str)
+
+
+def test_build_workbook_with_no_rows_produces_an_empty_sheet():
+    sheet = build_workbook([]).active
+    assert sheet.max_row == 1
+
+
+def test_to_bytes_with_no_rows_is_still_a_loadable_workbook():
+    data = to_bytes([])
+    openpyxl.load_workbook(BytesIO(data))

@@ -39,9 +39,27 @@ def test_adding_identical_values_twice_changes_nothing():
     assert basket[1]["value_sets"] == [{"lens_width": 55}]
 
 
+def test_add_keeps_first_name_when_product_already_queued():
+    basket = add({}, 1, "A", {"bridge": 15})
+    basket = add(basket, 1, "B", {"lens_width": 55})
+    assert basket[1]["name"] == "A"
+
+
+def test_add_with_empty_values_queues_product_with_no_contribution():
+    basket = add({}, 1, "A", {})
+    assert 1 in basket
+    assert basket[1]["value_sets"] == []
+    assert export_rows(basket, LOOKUP) == []
+
+
 def test_remove_drops_only_that_product():
     basket = add(add({}, 1, "A", {"bridge": 15}), 2, "B", {"bridge": 15})
     assert list(remove(basket, 1)) == [2]
+
+
+def test_remove_missing_product_is_a_harmless_noop():
+    basket = add({}, 1, "A", {"bridge": 15})
+    assert remove(basket, 999) == basket
 
 
 def test_category_ids_follow_dimension_order_and_never_repeat():
