@@ -115,7 +115,11 @@ else:
         left, right = st.columns([9, 1])
         with left:
             sizes = " | ".join(
-                ", ".join(f"{key}={value}" for key, value in value_set.items())
+                ", ".join(
+                    f"{dimension.label} {value_set[dimension.key]}"
+                    for dimension in DIMENSIONS
+                    if dimension.key in value_set
+                )
                 for value_set in entry["value_sets"]
             )
             st.markdown(f"**{entry['name']}** - `{global_id}`")
