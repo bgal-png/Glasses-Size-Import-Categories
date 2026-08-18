@@ -34,12 +34,6 @@ lookup = get_lookup()
 if "basket" not in st.session_state:
     st.session_state.basket = {}
 
-# Bumped after every add. It is part of every number_input key, which is how the
-# fields get cleared - Streamlit forbids writing to a widget's session state after
-# that widget has been instantiated, so a fresh key is the way to reset them.
-if "field_nonce" not in st.session_state:
-    st.session_state.field_nonce = 0
-
 st.title("Glasses Size Import Builder")
 
 # --- Zone 1: pick a product ------------------------------------------------
@@ -54,6 +48,8 @@ if query:
     if matches.empty:
         st.warning("No product matches that name.")
     else:
+        # row.name / row.globalId rely on the column names produced by
+        # size_import/catalogue.py (load_catalogue reads a "name"/"globalId" parquet).
         options = list(matches.itertuples(index=False))
         label = f"{len(options)} match(es)"
         if len(options) == 50:
@@ -80,23 +76,46 @@ for index, dimension in enumerate(DIMENSIONS):
             max_value=300,
             value=0,
             step=1,
-            key=f"input_{dimension.key}_{st.session_state.field_nonce}",
+            key=f"input_{dimension.key}",
         )
+        # 0 means "not entered": no dimension has a category for value 0
+        # (minimum values are bridge 1, temple 1, lens height 4, to-bend 10,
+        # lens width 14, glasses width 45), so a typed 0 is safe to treat as blank.
         if entered:
             values[dimension.key] = int(entered)
             category_id = resolve(lookup, dimension.key, int(entered))
             if category_id is None:
-                st.error(f"No category for {entered} - will be skipped")
+                st.error(f"No category for {dimension.label} {entered} - will be skipped")
             else:
                 st.caption(f"category {category_id}")
 
 add_disabled = selected_id is None or not values
-if st.button("Add to basket", type="primary", disabled=add_disabled):
-    st.session_state.basket = basket_module.add(
-        st.session_state.basket, selected_id, selected_name, values
-    )
-    st.session_state.field_nonce += 1
-    st.rerun()
+
+
+def add_to_basket(global_id, name):
+    # Runs before the widgets are re-instantiated on the rerun that follows a
+    # callback, so writing zero to each widget's own session-state key here is
+    # allowed - it clears the fields without needing a fresh key per add.
+    values = {}
+    for dimension in DIMENSIONS:
+        entered = st.session_state[f"input_{dimension.key}"]
+        if entered:
+            values[dimension.key] = int(entered)
+    if values:
+        st.session_state.basket = basket_module.add(
+            st.session_state.basket, global_id, name, values
+        )
+    for dimension in DIMENSIONS:
+        st.session_state[f"input_{dimension.key}"] = 0
+
+
+st.button(
+    "Add to basket",
+    type="primary",
+    disabled=add_disabled,
+    on_click=add_to_basket,
+    args=(selected_id, selected_name),
+)
 
 if selected_id is None:
     st.caption("Pick a product first.")
