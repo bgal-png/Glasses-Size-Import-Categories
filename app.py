@@ -68,13 +68,17 @@ st.subheader("2. Dimensions (mm)")
 columns = st.columns(3)
 values = {}
 
+# Seeded here rather than passed as `value=`: the add callback writes these keys, and
+# Streamlit warns when a widget has both a default value and a session-state value.
+for dimension in DIMENSIONS:
+    st.session_state.setdefault(f"input_{dimension.key}", 0)
+
 for index, dimension in enumerate(DIMENSIONS):
     with columns[index % 3]:
         entered = st.number_input(
             dimension.label,
             min_value=0,
             max_value=300,
-            value=0,
             step=1,
             key=f"input_{dimension.key}",
         )
