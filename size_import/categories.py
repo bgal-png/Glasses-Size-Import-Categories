@@ -31,10 +31,26 @@ DIMENSIONS = [
 BY_SOURCE_NAME = {dimension.source_name: dimension for dimension in DIMENSIONS}
 
 
+def _coerce_value(value):
+    """Return value as an int if it represents a whole number, else None.
+
+    Accepts plain ints and integral floats (e.g. `55.0` -> `55`, as openpyxl
+    may return for numeric cells). Rejects bool, non-integral floats, strings,
+    None and anything else.
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    return None
+
+
 def _is_usable(category_id, dimension, value):
     if category_id is None or dimension is None:
         return False
-    if isinstance(value, bool) or not isinstance(value, int):
+    if _coerce_value(value) is None:
         return False
     return True
 
@@ -55,12 +71,13 @@ def build_lookup(rows):
             dropped.append((category_id, source_name, value))
             continue
 
+        coerced_value = _coerce_value(value)
         bucket = lookup[dimension.key]
-        if value in bucket:
+        if coerced_value in bucket:
             collapsed += 1
-            bucket[value] = min(bucket[value], category_id)
+            bucket[coerced_value] = min(bucket[coerced_value], category_id)
         else:
-            bucket[value] = category_id
+            bucket[coerced_value] = category_id
 
     report = {
         "kept": sum(len(bucket) for bucket in lookup.values()),
@@ -84,6 +101,7 @@ def to_json_dict(lookup):
 
 
 def from_json_dict(raw):
+    """Reverse of to_json_dict: convert string keys back to integer values."""
     return {
         key: {int(value): category_id for value, category_id in bucket.items()}
         for key, bucket in raw.items()

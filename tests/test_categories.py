@@ -64,3 +64,37 @@ def test_json_round_trip_preserves_integer_keys():
     restored = from_json_dict(to_json_dict(lookup))
     assert restored == lookup
     assert resolve(restored, "lens_width", 55) == 4156
+
+
+def test_bool_value_is_dropped():
+    lookup, report = build_lookup([(4157, "Glasses size: bridge", True)])
+    assert resolve(lookup, "bridge", True) is None
+    assert resolve(lookup, "bridge", 1) is None
+    assert report["kept"] == 0
+    assert report["dropped"] == [(4157, "Glasses size: bridge", True)]
+
+
+def test_integral_float_value_resolves_same_as_int():
+    rows = [
+        (4156, "Glasses size: lens width", 55.0),
+        (5000, "Glasses size: lens width", 55),
+    ]
+    lookup, report = build_lookup(rows)
+    assert resolve(lookup, "lens_width", 55) == 4156
+    assert report["kept"] == 1
+    assert report["collapsed"] == 1
+
+
+def test_non_integral_float_value_is_dropped():
+    lookup, report = build_lookup([(34506, "Glasses size: lens height", 26.3)])
+    assert resolve(lookup, "lens_height", 26.3) is None
+    assert report["kept"] == 0
+    assert report["dropped"] == [(34506, "Glasses size: lens height", 26.3)]
+
+
+def test_build_lookup_of_empty_rows_returns_empty_lookup():
+    lookup, report = build_lookup([])
+    assert report["kept"] == 0
+    assert report["collapsed"] == 0
+    assert report["dropped"] == []
+    assert resolve(lookup, "lens_width", 55) is None
