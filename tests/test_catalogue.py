@@ -92,3 +92,15 @@ def test_load_catalogue_survives_commas_and_quotes_in_names(tmp_path):
 
     assert frame.loc[0, "name"] == '''Brand "Special", limited'''
     assert list(search(frame, "limited")["globalId"]) == [1]
+
+
+def test_names_that_look_like_null_survive_the_csv_round_trip(tmp_path):
+    path = tmp_path / "catalogue.csv.gz"
+    pd.DataFrame(
+        {"name": ["N/A Sport Frame", "NA", "None", "Real Product"], "globalId": [1, 2, 3, 4]}
+    ).to_csv(path, index=False, compression="gzip", encoding="utf-8")
+
+    frame = load_catalogue(path)
+
+    assert list(frame["name"]) == ["N/A Sport Frame", "NA", "None", "Real Product"]
+    assert list(search(frame, "none")["globalId"]) == [3]

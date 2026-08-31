@@ -24,7 +24,10 @@ def load_catalogue(path):
     into the desktop .exe for no gain, since the desktop app caches the parsed
     frame as a pickle anyway.
     """
-    frame = pd.read_csv(path, compression="gzip", encoding="utf-8")
+    # keep_default_na=False: pandas' default NA sentinel list ("NA", "N/A",
+    # "NULL", "None", ...) would otherwise turn a product literally named
+    # that into NaN, silently dropping its name and making it unsearchable.
+    frame = pd.read_csv(path, compression="gzip", encoding="utf-8", keep_default_na=False)
     frame["globalId"] = frame["globalId"].astype("int64")
     frame["search_key"] = frame["name"].map(normalize)
     return frame

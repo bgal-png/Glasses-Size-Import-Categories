@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Filesystem locations, PyInstaller-aware.
+r"""Filesystem locations, PyInstaller-aware.
 
 Bundled data files are located via sys._MEIPASS when frozen; the locally
 refreshed snapshot lives in %LOCALAPPDATA%\GlassesSizeImport so it survives
@@ -31,7 +31,7 @@ def repo_root() -> str:
 
 
 def cache_dir(*parts: str) -> str:
-    """%LOCALAPPDATA%\GlassesSizeImport[\parts] — created if missing."""
+    r"""%LOCALAPPDATA%\GlassesSizeImport[\parts] — created if missing."""
     base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
     path = os.path.join(base, _slug(APP_NAME), *parts)
     os.makedirs(path, exist_ok=True)
