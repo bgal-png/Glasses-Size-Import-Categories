@@ -145,8 +145,13 @@ class MainWindow(QMainWindow):
 
     def set_busy(self, busy: bool) -> None:
         self.progress.setVisible(bool(busy))
-        for action in (self.act_refresh, self.act_export, self.act_update):
+        for action in (
+            self.act_refresh, self.act_export, self.act_update,
+            self.act_remove, self.act_clear,
+        ):
             action.setEnabled(not busy)
+        if not busy:
+            self._on_tab_changed(self.tabs.currentIndex())
 
     def _update_title(self) -> None:
         mark = " •" if self.build_tab.has_unsaved_changes() else ""
@@ -156,11 +161,13 @@ class MainWindow(QMainWindow):
     def load_snapshot(self) -> None:
         try:
             self.snapshot = data_store.load_snapshot()
-        except (FileNotFoundError, RuntimeError) as error:
+        except Exception as error:
             self.snapshot = None
             self.data_status.setText("No data")
             self.data_status.setStyleSheet(theme.status_style("error"))
-            QMessageBox.warning(self, "No product data", str(error))
+            QMessageBox.warning(
+                self, "No product data", f"{error.__class__.__name__}: {error}"
+            )
             for tab in self.tab_widgets:
                 tab.set_snapshot(None)
             return
@@ -174,6 +181,15 @@ class MainWindow(QMainWindow):
         self.data_status.setStyleSheet(theme.status_style("ready"))
 
     def refresh_from_excel(self) -> None:
+        if self.build_tab.basket:
+            answer = QMessageBox.question(
+                self, "Basket not empty",
+                f"{len(self.build_tab.basket)} product(s) are in the basket. "
+                "Refreshing can change which category IDs they resolve to. Continue?",
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+            )
+            if answer != QMessageBox.Yes:
+                return
         catalogue_xlsx, _ = QFileDialog.getOpenFileName(
             self, "Select Main catalogue.xlsx",
             self.settings.last_dir("source") or os.path.expanduser("~"),
@@ -282,6 +298,14 @@ class MainWindow(QMainWindow):
 
     # --------------------------------------------------------------- close
     def closeEvent(self, event) -> None:
+        for worker in (self._worker, self._update_worker):
+            if worker is not None and worker.isRunning():
+                QMessageBox.information(
+                    self, "Still working",
+                    "A refresh or update is still running. Wait for it to finish before closing.",
+                )
+                event.ignore()
+                return
         if self.build_tab.has_unsaved_changes():
             answer = QMessageBox.question(
                 self, "Basket not exported",

@@ -31,6 +31,7 @@ class BuildTab(BaseTab):
         self.basket = {}
         self._selected_id = None
         self._selected_name = None
+        self._exported_signature = None
 
         self.panel = DimensionPanel()
         self.panel.add_requested.connect(self.add_to_basket)
@@ -153,6 +154,7 @@ class BuildTab(BaseTab):
         for global_id in ids:
             self.basket = basket_module.remove(self.basket, global_id)
         self._render_basket()
+        self.status_message.emit(f"Removed {len(ids)} product(s).")
 
     def clear_basket(self) -> None:
         if not self.basket:
@@ -165,6 +167,7 @@ class BuildTab(BaseTab):
             return
         self.basket = {}
         self._render_basket()
+        self.status_message.emit("Basket cleared.")
 
     # --- copying ---
     def _table_menu(self, point) -> None:
@@ -210,13 +213,28 @@ class BuildTab(BaseTab):
         )
         if not path:
             return
-        with open(path, "wb") as handle:
-            handle.write(to_bytes(rows))
+        try:
+            with open(path, "wb") as handle:
+                handle.write(to_bytes(rows))
+        except OSError as error:
+            QMessageBox.warning(
+                self, "Export failed",
+                f"Could not write {path}:\n{error}\n\n"
+                "If the file is open in Excel, close it and try again.",
+            )
+            return
         self.settings.set_last_dir("export", os.path.dirname(path))
+        self._exported_signature = self._signature()
         self.status_message.emit(f"Exported {len(rows)} product(s) to {path}")
         QMessageBox.information(
             self, "Exported", f"{len(rows)} product(s) written to:\n{path}"
         )
 
+    def _signature(self):
+        return repr(sorted(
+            (gid, tuple(sorted(tuple(sorted(v.items())) for v in entry["value_sets"])))
+            for gid, entry in self.basket.items()
+        ))
+
     def has_unsaved_changes(self) -> bool:
-        return bool(self.basket)
+        return bool(self.basket) and self._signature() != self._exported_signature
