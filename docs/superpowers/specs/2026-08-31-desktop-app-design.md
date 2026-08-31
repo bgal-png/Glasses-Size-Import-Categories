@@ -66,8 +66,10 @@ failure that hung the filler's selftest cannot occur here.
 
 ### Refresh from Excel
 
-`🔁 Refresh from Excel…` asks for `Main catalogue.xlsx` and `Glasses size category ids.xlsx`,
-then runs `refresh_catalogue` and `refresh_categories` in a `QThread` worker with
+`🔁 Refresh from Excel…` asks for `Main catalogue.xlsx` first, then for
+`Glasses size category ids.xlsx`; cancelling the second prompt refreshes only the
+catalogue and keeps the existing categories, since the two workbooks go stale
+independently. It then runs `refresh_catalogue` and `refresh_categories` in a `QThread` worker with
 `done` / `failed` / `progress` signals, writing into `%LOCALAPPDATA%\GlassesSizeImport\`.
 It reports the same counts the CLI prints, and the Data tab keeps them visible:
 
