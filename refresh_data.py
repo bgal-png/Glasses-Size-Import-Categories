@@ -38,7 +38,7 @@ def refresh_catalogue(source, destination):
         records.append((str(name).strip(), int(global_id)))
 
     frame = pd.DataFrame(records, columns=["name", "globalId"])
-    frame.to_parquet(destination, index=False)
+    frame.to_csv(destination, index=False, compression="gzip", encoding="utf-8")
     print(f"catalogue: {len(frame)} products -> {destination}")
     print(f"catalogue: {skipped} rows skipped (no name or no globalId)")
 
@@ -69,7 +69,7 @@ def main():
     args = parser.parse_args()
 
     DATA_DIR.mkdir(exist_ok=True)
-    refresh_catalogue(args.catalogue, DATA_DIR / "catalogue.parquet")
+    refresh_catalogue(args.catalogue, DATA_DIR / "catalogue.csv.gz")
     refresh_categories(args.categories, DATA_DIR / "categories.json")
 
 
