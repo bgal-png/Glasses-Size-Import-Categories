@@ -2,6 +2,7 @@
 import json
 import os
 import sys
+from pathlib import Path
 
 import openpyxl
 import pandas as pd
@@ -166,3 +167,51 @@ def test_refresh_can_update_the_catalogue_alone(dirs, tmp_path):
     snapshot = data_store.load_snapshot()
     assert list(snapshot.catalogue["globalId"]) == [111, 222]
     assert snapshot.lookup["lens_width"][55] == 4156, "categories fall back to the bundled copy"
+    assert snapshot.source == "mixed"
+    assert snapshot.catalogue_source == "local"
+    assert snapshot.categories_source == "bundled"
+
+
+def test_refresh_leaves_no_tmp_files_and_writes_a_complete_destination(dirs, tmp_path):
+    local, bundled = dirs
+    catalogue_xlsx = tmp_path / "Main catalogue.xlsx"
+    categories_xlsx = tmp_path / "Glasses size category ids.xlsx"
+    _catalogue_workbook(catalogue_xlsx)
+    _categories_workbook(categories_xlsx)
+
+    data_store.refresh_from_excel(str(catalogue_xlsx), str(categories_xlsx))
+
+    leftover = [p for p in Path(local).iterdir() if p.suffix == ".tmp" or p.name.endswith(".tmp")]
+    assert leftover == []
+
+    # destination content is complete and loadable
+    frame = data_store.load_catalogue(str(Path(local) / "catalogue.csv.gz"))
+    assert list(frame["globalId"]) == [111, 222]
+    categories = json.loads((Path(local) / "categories.json").read_text(encoding="utf-8"))
+    assert categories
+
+
+def test_corrupt_categories_json_raises_a_clear_error(dirs):
+    local, bundled = dirs
+    _write_snapshot(bundled)
+    (Path(bundled) / "categories.json").write_text("{not json", encoding="utf-8")
+
+    with pytest.raises(RuntimeError) as excinfo:
+        data_store.load_snapshot()
+
+    message = str(excinfo.value)
+    assert "categories.json" in message
+    assert "Refresh from Excel" in message
+
+
+def test_corrupt_catalogue_raises_a_clear_error(dirs):
+    local, bundled = dirs
+    _write_snapshot(bundled)
+    (Path(bundled) / "catalogue.csv.gz").write_bytes(b"not a gzip file at all")
+
+    with pytest.raises(RuntimeError) as excinfo:
+        data_store.load_snapshot()
+
+    message = str(excinfo.value)
+    assert "catalogue.csv.gz" in message
+    assert "Refresh from Excel" in message

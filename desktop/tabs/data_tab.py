@@ -43,7 +43,16 @@ class DataTab(BaseTab):
             self.status.setText("No snapshot loaded.")
             self.status.setStyleSheet(theme.status_style("error"))
             return
-        origin = "refreshed locally" if snapshot.source == "local" else "bundled with the app"
+        if snapshot.source == "mixed":
+            def _label(part_source):
+                return "refreshed locally" if part_source == "local" else "bundled with the app"
+
+            origin = (
+                f"catalogue {_label(snapshot.catalogue_source)}, "
+                f"categories {_label(snapshot.categories_source)}"
+            )
+        else:
+            origin = "refreshed locally" if snapshot.source == "local" else "bundled with the app"
         self.status.setText(
             f"Snapshot ready — {origin}, {len(snapshot.catalogue):,} products, "
             f"{sum(len(v) for v in snapshot.lookup.values())} categories"

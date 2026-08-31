@@ -8,6 +8,7 @@ Run locally whenever either source export changes, then commit data/.
 
 import argparse
 import json
+import os
 from pathlib import Path
 
 import openpyxl
@@ -39,7 +40,10 @@ def refresh_catalogue(source, destination):
         records.append((str(name).strip(), int(global_id)))
 
     frame = pd.DataFrame(records, columns=["name", "globalId"])
-    frame.to_csv(destination, index=False, compression="gzip", encoding="utf-8")
+    destination = Path(destination)
+    temporary = destination.with_suffix(destination.suffix + ".tmp")
+    frame.to_csv(temporary, index=False, compression="gzip", encoding="utf-8")
+    os.replace(temporary, destination)
 
     report = {"products": len(frame), "skipped": skipped, "destination": str(destination)}
     print(f"catalogue: {report['products']} products -> {destination}")
@@ -55,9 +59,12 @@ def refresh_categories(source, destination):
     rows = [row[:3] for row in sheet.iter_rows(min_row=2, values_only=True) if row[0]]
     lookup, build_report = build_lookup(rows)
 
-    destination.write_text(
+    destination = Path(destination)
+    temporary = destination.with_suffix(destination.suffix + ".tmp")
+    temporary.write_text(
         json.dumps(to_json_dict(lookup), indent=1, sort_keys=True), encoding="utf-8"
     )
+    os.replace(temporary, destination)
 
     report = {
         "rows": len(rows),

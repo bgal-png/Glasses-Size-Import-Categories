@@ -33,7 +33,9 @@ CACHE_FILE = "catalogue.pkl"
 class Snapshot:
     catalogue: object          # DataFrame: name, globalId, search_key
     lookup: dict               # {dimension key: {mm value: category ID}}
-    source: str                # "local" or "bundled"
+    source: str                # "local", "bundled", or "mixed"
+    catalogue_source: str      # "local" or "bundled"
+    categories_source: str     # "local" or "bundled"
     catalogue_path: str
     categories_path: str
     updated_at: datetime       # mtime of the catalogue file
@@ -63,7 +65,7 @@ def _resolve(filename: str) -> tuple[str, str]:
 
 def _cache_key(path: str) -> tuple:
     stat = os.stat(path)
-    return (int(stat.st_mtime), stat.st_size)
+    return (stat.st_mtime_ns, stat.st_size)
 
 
 def _load_catalogue_cached(path: str):
@@ -76,10 +78,16 @@ def _load_catalogue_cached(path: str):
                 cached = pickle.load(handle)
             if cached.get("key") == key and cached.get("path") == path:
                 return cached["frame"]
-        except Exception:
+        except (pickle.UnpicklingError, EOFError, KeyError, AttributeError, OSError):
             pass  # a corrupt cache is not worth a crash; reparse instead
 
-    frame = load_catalogue(path)
+    try:
+        frame = load_catalogue(path)
+    except Exception as error:
+        raise RuntimeError(
+            f"{path} could not be read ({error}). Use 'Refresh from Excel' to rebuild it."
+        ) from error
+
     temporary = cache_path + ".tmp"
     try:
         with open(temporary, "wb") as handle:
@@ -89,7 +97,7 @@ def _load_catalogue_cached(path: str):
                 protocol=pickle.HIGHEST_PROTOCOL,
             )
         os.replace(temporary, cache_path)
-    except Exception:
+    except OSError:
         pass  # caching is an optimisation, never a requirement
     return frame
 
@@ -99,13 +107,26 @@ def load_snapshot() -> Snapshot:
     categories_path, categories_source = _resolve(CATEGORIES_FILE)
 
     frame = _load_catalogue_cached(catalogue_path)
-    lookup = from_json_dict(json.loads(open(categories_path, encoding="utf-8").read()))
+    try:
+        with open(categories_path, encoding="utf-8") as handle:
+            raw = json.load(handle)
+    except (json.JSONDecodeError, OSError, UnicodeDecodeError) as error:
+        raise RuntimeError(
+            f"{categories_path} could not be read ({error}). "
+            f"Use 'Refresh from Excel' to rebuild it."
+        ) from error
+    lookup = from_json_dict(raw)
 
-    source = "local" if "local" in (catalogue_source, categories_source) else "bundled"
+    if catalogue_source == categories_source:
+        source = catalogue_source
+    else:
+        source = "mixed"
     return Snapshot(
         catalogue=frame,
         lookup=lookup,
         source=source,
+        catalogue_source=catalogue_source,
+        categories_source=categories_source,
         catalogue_path=catalogue_path,
         categories_path=categories_path,
         updated_at=datetime.fromtimestamp(os.path.getmtime(catalogue_path)),
