@@ -99,7 +99,7 @@ class DimensionPanel(QWidget):
                 continue
             category_id = resolve(self._lookup, dimension.key, value)
             if category_id is None:
-                note.setText(f"No category for {value} — will be skipped")
+                note.setText(f"No category for {dimension.label} {value} — will be skipped")
                 note.setStyleSheet(
                     f"background-color: {theme.COLOR_ERROR};"
                     f"color: {theme.COLOR_FORCED_TEXT}; padding: 2px 4px; border-radius: 3px;"

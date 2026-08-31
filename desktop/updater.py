@@ -116,11 +116,14 @@ def build_swap_script(pid: int, src: str, dst: str, log: str) -> str:
     process object is gone, and everything is logged so a failure is diagnosable.
     """
     q_src, q_dst, q_log = _ps_quote(src), _ps_quote(dst), _ps_quote(log)
+    q_bak = _ps_quote(str(dst) + ".bak")
     return (
         "$ErrorActionPreference='Continue'; "
         f"function L($m){{ \"$(Get-Date -Format o) $m\" | Out-File -FilePath {q_log} -Append -Encoding utf8 }}; "
         f"L 'waiting for pid {pid}'; "
         f"Wait-Process -Id {pid} -Timeout 180 -ErrorAction SilentlyContinue; "
+        f"try{{ Move-Item -LiteralPath {q_dst} -Destination {q_bak} -Force -ErrorAction Stop; L 'backed up old exe to .bak' }}"
+        f"catch{{ L \"backup failed: $_\" }}; "
         "$moved=$false; "
         "for($i=0;$i -lt 40 -and -not $moved;$i++){ "
         f"  try{{ Move-Item -LiteralPath {q_src} -Destination {q_dst} -Force -ErrorAction Stop; $moved=$true }}"
@@ -155,6 +158,14 @@ def download_and_swap(release: dict, token: str = "", progress=None) -> str:
     if total and read < total:
         os.remove(new_path)
         raise IOError(f"Download incomplete ({read} of {total} bytes) — update aborted.")
+
+    with open(new_path, "rb") as handle:
+        magic = handle.read(2)
+    if magic != b"MZ" or os.path.getsize(new_path) < 1_000_000:
+        os.remove(new_path)
+        raise IOError(
+            "The downloaded file is not a valid Windows executable — update aborted."
+        )
 
     if not is_frozen():
         return new_path  # nothing to swap when running from source

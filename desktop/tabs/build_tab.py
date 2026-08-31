@@ -20,7 +20,7 @@ from size_import.export import export_filename, to_bytes
 from tabs.base import BaseTab
 
 SEARCH_LIMIT = 50
-COLUMNS = ["Product", "Global ID", "Sizes", "Category IDs"]
+COLUMNS = ["Name", "Global ID", "Sizes", "Category IDs"]
 
 
 class BuildTab(BaseTab):
@@ -60,6 +60,7 @@ class BuildTab(BaseTab):
         # Qt table headers are not selectable text, so offer copying explicitly.
         self.table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._table_menu)
+        self.table.horizontalHeader().sectionClicked.connect(self._copy_column)
         layout.addWidget(self.table, 1)
 
     # --- snapshot ---
@@ -192,6 +193,18 @@ class BuildTab(BaseTab):
             )
         QApplication.clipboard().setText("\n".join(lines))
         self.status_message.emit("Copied — paste straight into Excel.")
+
+    def _copy_column(self, column: int) -> None:
+        header = COLUMNS[column]
+        row_count = self.table.rowCount()
+        lines = [header]
+        for row in range(row_count):
+            item = self.table.item(row, column)
+            lines.append(item.text() if item is not None else "")
+        QApplication.clipboard().setText("\n".join(lines))
+        self.status_message.emit(
+            f'Copied "{header}" ({row_count} row(s)).'
+        )
 
     # --- export ---
     def export(self) -> None:

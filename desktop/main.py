@@ -207,8 +207,10 @@ class MainWindow(QMainWindow):
         self.set_busy(True)
         self.show_status("Refreshing from Excel — this takes about 15 seconds…")
         worker = Worker(
-            data_store.refresh_from_excel, catalogue_xlsx, categories_xlsx or None
+            data_store.refresh_from_excel, catalogue_xlsx, categories_xlsx or None,
+            pass_progress=True,
         )
+        worker.progress.connect(lambda _fraction, text: self.show_status(text))
 
         def done(report):
             self.set_busy(False)
@@ -277,8 +279,10 @@ class MainWindow(QMainWindow):
     def _download_update(self, release: dict) -> None:
         self.set_busy(True)
         worker = Worker(
-            updater.download_and_swap, release, self.settings.update_token
+            updater.download_and_swap, release, self.settings.update_token,
+            pass_progress=True,
         )
+        worker.progress.connect(lambda _fraction, text: self.show_status(text))
 
         def done(_path):
             self.set_busy(False)
@@ -338,6 +342,15 @@ def _selftest(win) -> int:
             f"  [{index}] {win.tabs.tabText(index)!r:20} "
             f"dock={'yes' if panel is not None else 'no'}"
         )
+        dock_visible = not win.dock.isHidden()
+        if panel is not None and not dock_visible:
+            problems.append(
+                f"{tab.__class__.__name__}: dock hidden on a tab that has a control panel"
+            )
+        elif panel is None and dock_visible:
+            problems.append(
+                f"{tab.__class__.__name__}: dock shown on a tab with no control panel"
+            )
         for name in ("set_snapshot", "control_panel", "has_unsaved_changes"):
             if not callable(getattr(tab, name, None)):
                 problems.append(f"{tab.__class__.__name__} missing {name}")
