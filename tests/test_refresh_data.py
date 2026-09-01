@@ -35,7 +35,7 @@ def _build_workbook(path, rows):
 
 def test_extracts_name_and_global_id_from_correct_columns(tmp_path):
     source = tmp_path / "catalogue.xlsx"
-    destination = tmp_path / "catalogue.parquet"
+    destination = tmp_path / "catalogue.csv.gz"
     rows = [
         _make_row(name="Crulle G5063", global_id=1001),
         _make_row(name="Ray-Ban RB2140", global_id=1002),
@@ -44,7 +44,7 @@ def test_extracts_name_and_global_id_from_correct_columns(tmp_path):
 
     refresh_catalogue(source, destination)
 
-    frame = pd.read_parquet(destination)
+    frame = pd.read_csv(destination, compression="gzip", encoding="utf-8")
     pairs = set(zip(frame["name"], frame["globalId"]))
     assert pairs == {("Crulle G5063", 1001), ("Ray-Ban RB2140", 1002)}
     assert list(frame.columns) == ["name", "globalId"]
@@ -52,7 +52,7 @@ def test_extracts_name_and_global_id_from_correct_columns(tmp_path):
 
 def test_row_missing_global_id_is_skipped(tmp_path):
     source = tmp_path / "catalogue.xlsx"
-    destination = tmp_path / "catalogue.parquet"
+    destination = tmp_path / "catalogue.csv.gz"
     rows = [
         _make_row(name="Has both", global_id=2001),
         _make_row(name="No global id", global_id=None),
@@ -61,7 +61,7 @@ def test_row_missing_global_id_is_skipped(tmp_path):
 
     refresh_catalogue(source, destination)
 
-    frame = pd.read_parquet(destination)
+    frame = pd.read_csv(destination, compression="gzip", encoding="utf-8")
     assert len(frame) == 1
     assert frame.iloc[0]["name"] == "Has both"
     assert int(frame.iloc[0]["globalId"]) == 2001
@@ -69,7 +69,7 @@ def test_row_missing_global_id_is_skipped(tmp_path):
 
 def test_row_missing_name_is_skipped(tmp_path):
     source = tmp_path / "catalogue.xlsx"
-    destination = tmp_path / "catalogue.parquet"
+    destination = tmp_path / "catalogue.csv.gz"
     rows = [
         _make_row(name=None, global_id=3001),
         _make_row(name="Has both", global_id=3002),
@@ -78,7 +78,7 @@ def test_row_missing_name_is_skipped(tmp_path):
 
     refresh_catalogue(source, destination)
 
-    frame = pd.read_parquet(destination)
+    frame = pd.read_csv(destination, compression="gzip", encoding="utf-8")
     assert len(frame) == 1
     assert frame.iloc[0]["name"] == "Has both"
     assert int(frame.iloc[0]["globalId"]) == 3002
@@ -86,7 +86,7 @@ def test_row_missing_name_is_skipped(tmp_path):
 
 def test_skipped_count_matches_printed_summary(tmp_path, capsys):
     source = tmp_path / "catalogue.xlsx"
-    destination = tmp_path / "catalogue.parquet"
+    destination = tmp_path / "catalogue.csv.gz"
     rows = [
         _make_row(name="Kept one", global_id=4001),
         _make_row(name="Kept two", global_id=4002),
@@ -99,7 +99,7 @@ def test_skipped_count_matches_printed_summary(tmp_path, capsys):
     refresh_catalogue(source, destination)
 
     captured = capsys.readouterr()
-    frame = pd.read_parquet(destination)
+    frame = pd.read_csv(destination, compression="gzip", encoding="utf-8")
     assert len(frame) == 2
     assert "catalogue: 2 products" in captured.out
     assert "catalogue: 3 rows skipped (no name or no globalId)" in captured.out

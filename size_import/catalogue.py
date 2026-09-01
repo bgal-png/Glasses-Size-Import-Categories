@@ -18,8 +18,17 @@ def normalize(text):
 
 
 def load_catalogue(path):
-    """Read catalogue.parquet and attach the precomputed search key column."""
-    frame = pd.read_parquet(path)
+    """Read catalogue.csv.gz and attach the precomputed search key column.
+
+    Gzipped CSV rather than parquet on purpose: parquet drags pyarrow (~40 MB)
+    into the desktop .exe for no gain, since the desktop app caches the parsed
+    frame as a pickle anyway.
+    """
+    # keep_default_na=False: pandas' default NA sentinel list ("NA", "N/A",
+    # "NULL", "None", ...) would otherwise turn a product literally named
+    # that into NaN, silently dropping its name and making it unsearchable.
+    frame = pd.read_csv(path, compression="gzip", encoding="utf-8", keep_default_na=False)
+    frame["globalId"] = frame["globalId"].astype("int64")
     frame["search_key"] = frame["name"].map(normalize)
     return frame
 

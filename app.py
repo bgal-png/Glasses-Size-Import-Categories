@@ -19,7 +19,7 @@ st.set_page_config(page_title="Glasses Size Import", page_icon="👓", layout="w
 
 @st.cache_data
 def get_catalogue():
-    return load_catalogue(DATA_DIR / "catalogue.parquet")
+    return load_catalogue(DATA_DIR / "catalogue.csv.gz")
 
 
 @st.cache_data
@@ -49,7 +49,7 @@ if query:
         st.warning("No product matches that name.")
     else:
         # row.name / row.globalId rely on the column names produced by
-        # size_import/catalogue.py (load_catalogue reads a "name"/"globalId" parquet).
+        # size_import/catalogue.py (load_catalogue reads a "name"/"globalId" gzipped CSV).
         options = list(matches.itertuples(index=False))
         label = f"{len(options)} match(es)"
         if len(options) == 50:

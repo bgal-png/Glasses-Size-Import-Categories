@@ -71,9 +71,36 @@ def test_query_with_regex_metacharacters_does_not_raise_and_finds_nothing():
     assert list(result["globalId"]) == []
 
 
-def test_load_catalogue_end_to_end(tmp_path):
-    path = tmp_path / "catalogue.parquet"
-    CATALOGUE.to_parquet(path)
+def test_load_catalogue_reads_gzipped_csv(tmp_path):
+    path = tmp_path / "catalogue.csv.gz"
+    CATALOGUE.to_csv(path, index=False, compression="gzip", encoding="utf-8")
+
     frame = load_catalogue(path)
-    result = search(frame, "ray-ban aviator")
-    assert list(result["globalId"]) == [245002]
+
+    assert list(frame["globalId"]) == [1588262, 245001, 245002, 14]
+    assert frame["globalId"].dtype.kind == "i"
+    assert list(search(frame, "crulle")["globalId"]) == [1588262]
+
+
+def test_load_catalogue_survives_commas_and_quotes_in_names(tmp_path):
+    path = tmp_path / "catalogue.csv.gz"
+    pd.DataFrame(
+        {"name": ['''Brand "Special", limited''', "Plain Name"], "globalId": [1, 2]}
+    ).to_csv(path, index=False, compression="gzip", encoding="utf-8")
+
+    frame = load_catalogue(path)
+
+    assert frame.loc[0, "name"] == '''Brand "Special", limited'''
+    assert list(search(frame, "limited")["globalId"]) == [1]
+
+
+def test_names_that_look_like_null_survive_the_csv_round_trip(tmp_path):
+    path = tmp_path / "catalogue.csv.gz"
+    pd.DataFrame(
+        {"name": ["N/A Sport Frame", "NA", "None", "Real Product"], "globalId": [1, 2, 3, 4]}
+    ).to_csv(path, index=False, compression="gzip", encoding="utf-8")
+
+    frame = load_catalogue(path)
+
+    assert list(frame["name"]) == ["N/A Sport Frame", "NA", "None", "Real Product"]
+    assert list(search(frame, "none")["globalId"]) == [3]

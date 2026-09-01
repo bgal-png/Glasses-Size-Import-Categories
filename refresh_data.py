@@ -8,6 +8,7 @@ Run locally whenever either source export changes, then commit data/.
 
 import argparse
 import json
+import os
 from pathlib import Path
 
 import openpyxl
@@ -24,6 +25,7 @@ GLOBAL_ID_COLUMN = 103  # column CZ, zero-based
 
 
 def refresh_catalogue(source, destination):
+    """Extract name + globalId into a gzipped CSV. Returns a report dict."""
     workbook = openpyxl.load_workbook(source, read_only=True, data_only=True)
     sheet = workbook[workbook.sheetnames[0]]
 
@@ -38,28 +40,46 @@ def refresh_catalogue(source, destination):
         records.append((str(name).strip(), int(global_id)))
 
     frame = pd.DataFrame(records, columns=["name", "globalId"])
-    frame.to_parquet(destination, index=False)
-    print(f"catalogue: {len(frame)} products -> {destination}")
-    print(f"catalogue: {skipped} rows skipped (no name or no globalId)")
+    destination = Path(destination)
+    temporary = destination.with_suffix(destination.suffix + ".tmp")
+    frame.to_csv(temporary, index=False, compression="gzip", encoding="utf-8")
+    os.replace(temporary, destination)
+
+    report = {"products": len(frame), "skipped": skipped, "destination": str(destination)}
+    print(f"catalogue: {report['products']} products -> {destination}")
+    print(f"catalogue: {report['skipped']} rows skipped (no name or no globalId)")
+    return report
 
 
 def refresh_categories(source, destination):
+    """Build the deduped category lookup as JSON. Returns a report dict."""
     workbook = openpyxl.load_workbook(source, read_only=True, data_only=True)
     sheet = workbook[workbook.sheetnames[0]]
 
     rows = [row[:3] for row in sheet.iter_rows(min_row=2, values_only=True) if row[0]]
-    lookup, report = build_lookup(rows)
+    lookup, build_report = build_lookup(rows)
 
-    destination.write_text(
+    destination = Path(destination)
+    temporary = destination.with_suffix(destination.suffix + ".tmp")
+    temporary.write_text(
         json.dumps(to_json_dict(lookup), indent=1, sort_keys=True), encoding="utf-8"
     )
+    os.replace(temporary, destination)
 
-    print(f"categories: {len(rows)} rows read")
+    report = {
+        "rows": len(rows),
+        "collapsed": build_report["collapsed"],
+        "dropped": build_report["dropped"],
+        "kept": build_report["kept"],
+        "destination": str(destination),
+    }
+    print(f"categories: {report['rows']} rows read")
     print(f"categories: {report['collapsed']} duplicates collapsed (lowest ID kept)")
     print(f"categories: {len(report['dropped'])} rows dropped:")
     for category_id, name, value in report["dropped"]:
         print(f"  - id={category_id} name={name!r} value={value!r}")
     print(f"categories: {report['kept']} usable categories -> {destination}")
+    return report
 
 
 def main():
@@ -69,7 +89,7 @@ def main():
     args = parser.parse_args()
 
     DATA_DIR.mkdir(exist_ok=True)
-    refresh_catalogue(args.catalogue, DATA_DIR / "catalogue.parquet")
+    refresh_catalogue(args.catalogue, DATA_DIR / "catalogue.csv.gz")
     refresh_categories(args.categories, DATA_DIR / "categories.json")
 
 
