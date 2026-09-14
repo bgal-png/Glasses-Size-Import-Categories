@@ -6,7 +6,9 @@ skip rows missing either value."""
 import openpyxl
 import pandas as pd
 
-from refresh_data import refresh_catalogue
+import pytest
+
+from refresh_data import refresh_catalogue, refresh_categories
 
 NAME_COLUMN = 2
 GLOBAL_ID_COLUMN = 103
@@ -103,3 +105,39 @@ def test_skipped_count_matches_printed_summary(tmp_path, capsys):
     assert len(frame) == 2
     assert "catalogue: 2 products" in captured.out
     assert "catalogue: 3 rows skipped (no name or no globalId)" in captured.out
+
+
+def _category_workbook(path, rows):
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.append(["ID", "Global category name", "Value"])
+    for row in rows:
+        sheet.append(list(row))
+    workbook.save(path)
+
+
+def test_refresh_categories_writes_a_recognisable_workbook(tmp_path):
+    source = tmp_path / "categories.xlsx"
+    destination = tmp_path / "categories.json"
+    _category_workbook(source, [(4156, "Glasses size: lens width", 55)])
+
+    report = refresh_categories(source, destination)
+
+    assert report["kept"] == 1
+    assert destination.exists()
+
+
+def test_refresh_categories_refuses_a_workbook_with_no_categories(tmp_path):
+    """Picking the wrong workbook must not wipe a working categories file."""
+    source = tmp_path / "not-the-categories.xlsx"
+    destination = tmp_path / "categories.json"
+    destination.write_text('{"lens_width": {"55": 4156}}', encoding="utf-8")
+    _category_workbook(source, [(1, "Some unrelated column", "x")])
+
+    with pytest.raises(ValueError) as excinfo:
+        refresh_categories(source, destination)
+
+    assert "no" in str(excinfo.value).lower()
+    assert "Glasses size:" in str(excinfo.value)
+    assert destination.read_text(encoding="utf-8") == '{"lens_width": {"55": 4156}}'
+    assert not list(tmp_path.glob("*.tmp"))

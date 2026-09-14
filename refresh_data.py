@@ -59,6 +59,16 @@ def refresh_categories(source, destination):
     rows = [row[:3] for row in sheet.iter_rows(min_row=2, values_only=True) if row[0]]
     lookup, build_report = build_lookup(rows)
 
+    # Refuse to write an empty lookup. A locally refreshed file always wins over
+    # the bundled one, so saving zero categories here would leave the app unable
+    # to resolve anything until the file is deleted by hand. Reaching zero means
+    # the wrong workbook was picked, not that the categories are gone.
+    if build_report["kept"] == 0:
+        raise ValueError(
+            f"{source} has no 'Glasses size:' categories in it ({len(rows)} rows read). "
+            "That is not the category workbook - nothing was changed."
+        )
+
     destination = Path(destination)
     temporary = destination.with_suffix(destination.suffix + ".tmp")
     temporary.write_text(
